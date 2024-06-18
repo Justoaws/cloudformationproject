@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: "ami-08a0d1e16fc3f61ea"
+    us-east-2:
+      AMI: "ami-033fabdd332044f06"
+    us-west-1:
+      AMI: "ami-0ca1f30768d0cf0e1"
+    us-west-2:
+      AMI: "ami-0b20a6f09484773af"
+    eu-west-1:
+      AMI: "ami-0551ce4d67096d606"
+    sa-east-1:
+      AMI: "ami-0df032b0fbc220383"
+    ap-southeast-1:
+      AMI: "ami-04c913012f8977029"
+    ap-southeast-2:
+      AMI: "ami-0e326862c8e74c0fe"
+    ap-northeast-1:
+      AMI: "ami-0f9fe1d9214628296"
+
+Parameters:
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+      - t3.micro
+    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+
+
+Resources:
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock: 10.0.0.0/16
+  PublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.0.0/24
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetNetworkAclAssociation:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      NetworkAclId: !GetAtt 
+        - VPC
+        - DefaultNetworkAcl
+  WebServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable HTTP ingress
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0       
+  
+  MyEC2Instance: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      AvailabilityZone: us-west-2b
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      SubnetId: !Ref PublicSubnet
+      InstanceType: !Ref InstanceTypeParameter
+      SecurityGroupIds: 
+       - !Ref WebServerSecurityGroup
+      Tags:
+       - Key: Name
+         Value: justo-mebodo
+      UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install httpd -y
+            echo "<html><body><h1>This Server was launched by Justo Mebodo by using cloudformation template</h1></body></html>" > /var/www/html/index.html
+            systemctl start httpd
+            systemctl enable httpd   
+
+  myEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref MyEC2Instance
+
