@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to launch an EC2 instance and configure Route 53 for justoaws.com.
+
+Parameters:
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    
+
+Resources:
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: awesome-key-east1
+      ImageId: "ami-08a0d1e16fc3f61ea"  # Update this with the latest Amazon Linux 2 AMI ID for your region
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Welcome to justodevops.com!</h1></body></html>" > /var/www/html/index.html
+
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      
+      BranchName: 'justodevops.com'
+      Prefix: 'ec2'
+
+  SubdomainRecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: justodevops.com.
+      Name: ec2.justodevops.com  # Replace with your subdomain name
+      Type: A
+      TTL: '300'
+      ResourceRecords:
+        - WebServerInstance-PublicIp  # Replace with the IP address or endpoint you want to link to the subdomain    
+
+  Route53RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: justodevops.com.
+      Name: ec2.justodevops.com.
+      Type: CNAME
+      TTL: '300'
+      ResourceRecords:
+        - !GetAtt 
+          - WebServerInstance
+          - PublicIp
+
+Outputs:
+  InstanceId:
+    Description: InstanceId of the newly created EC2 instance
+    Value: !Ref WebServerInstance
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt 
+      - WebServerInstance
+      - PublicIp
+  WebsiteURL:
+    Description: URL of the website
+    Value: !Sub http://ec2.justodevops.com

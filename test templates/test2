@@ -1,8 +1,38 @@
-AWSTemplateFormatVersion: 2010-09-09
-Description: >-
-  AWS CloudFormation Sample Template VPC_with_PublicIPs_And_DNS: Sample template
-  that creates a VPC with DNS and public IPs enabled. Note that you are billed
-  for the AWS resources that you use when you create a stack from this template.
+AWSTemplateFormatVersion: "2010-09-09"
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: "ami-08a0d1e16fc3f61ea"
+    us-east-2:
+      AMI: "ami-033fabdd332044f06"
+    us-west-1:
+      AMI: "ami-0ca1f30768d0cf0e1"
+    us-west-2:
+      AMI: "ami-0b20a6f09484773af"
+    eu-west-1:
+      AMI: "ami-0551ce4d67096d606"
+    sa-east-1:
+      AMI: "ami-0df032b0fbc220383"
+    ap-southeast-1:
+      AMI: "ami-04c913012f8977029"
+    ap-southeast-2:
+      AMI: "ami-0e326862c8e74c0fe"
+    ap-northeast-1:
+      AMI: "ami-0f9fe1d9214628296"
+
+Parameters:
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+      - t3.micro
+    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+
+
 
 Resources:
   VPC:
@@ -57,6 +87,45 @@ Resources:
           ToPort: '80'
           CidrIp: 0.0.0.0/0
 
+  MyEC2Instance: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      AvailabilityZone: us-east-1a
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      SubnetId: !Ref PublicSubnet
+      InstanceType: !Ref InstanceTypeParameter
+      Tags:
+       - Key: Name
+         Value: justo-mebodo
+#      SecurityGroupIds: 
+#        - !Ref WebServerSecurityGroup
+
+#      SecurityGroup:
+#       - !Ref WebServerSecurityGroup
+#      SecurityGroupIds:
+#          - !Ref WebServerSecurityGroup
+#  sgwithoutegress:
+#    Type: AWS::EC2::SecurityGroup
+#    Properties:
+#      GroupDescription: enable traffic
+#      SecurityGroupEgress:
+#        - !Ref WebServerSecurityGroup
+  myEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref MyEC2Instance
+
+
+      UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install httpd -y
+            echo "<html><body><h1>This Server was launched by Justo Mebodo by using cloudformation template</h1></body></html>" > /var/www/html/index.html
+            systemctl start httpd
+            systemctl enable httpd
+
+  
 Outputs:
   VPCId:
     Description: VPC ID
@@ -75,5 +144,3 @@ Outputs:
       - GroupId
     Export:
       Name: !Sub '${AWS::StackName}-SecurityGroupID'
-
-      

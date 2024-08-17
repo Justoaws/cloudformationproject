@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  MyEC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: t2.micro
+      ImageId: "ami-08a0d1e16fc3f61ea" # Replace with the desired AMI ID
+      KeyName: awesome-key-east1            # Replace with your key pair name
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      Tags:
+       - Key: Name
+         Value: ec2-route53-server
+      UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install httpd -y
+            echo "<html><body><h1>HELLO THIS SERVER WAS BUILD WITH A CUSTON DNS. 
+            It's was made by Justo Mebodo using cloudformation template</h1></body></html>" > /var/www/html/index.html
+            systemctl start httpd
+            systemctl enable httpd     
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable SSH and HTTP access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+
+  Route53HostedZone:
+    Type: 'AWS::Route53::HostedZone'
+    Properties:
+      Name: justoaws.com
+
+  Route53RecordSet:
+    Type: 'AWS::Route53::RecordSet'
+    Properties:
+      HostedZoneId: !Ref Route53HostedZone
+      Name: justoaws.com
+      Type: 'A'
+      TTL: '60'
+      ResourceRecords:
+        - !GetAtt MyEC2Instance.PublicIp
+
+Outputs:
+  InstanceId:
+    Description: 'Instance ID of the newly created EC2 instance'
+    Value: !Ref MyEC2Instance
+  PublicIP:
+    Description: 'Public IP address of the newly created EC2 instance'
+    Value: !GetAtt MyEC2Instance.PublicIp
+  WebsiteURL:
+    Description: 'URL of the website'
+    Value: !Join ['', ['http://', justoaws.com]]

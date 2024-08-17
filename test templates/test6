@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: "ami-08a0d1e16fc3f61ea"
+      KeyName: awesome-key-east1
+      # Other instance properties as needed
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>Welcome to Justo.com!</h1></body></html>" > /var/www/html/index.html
+  MyDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Ref MyHostedZoneName
+      Name: justoaws.com.   # Replace with your desired domain/subdomain
+      Type: 'A'
+      TTL: '900'
+      ResourceRecords:
+        - !GetAtt MyEC2Instance.PublicDnsName
+
+Parameters:
+  MyHostedZoneName:
+    Type: String
+    Description: Name of the hosted zone where the CNAME record will be created
+    Default: justoaws.com.   # Replace with your hosted zone name
+
+Outputs:
+  EC2InstancePublicDNS:
+    Description: Public DNS name of the EC2 instance
+    Value: !GetAtt MyEC2Instance.PublicDnsName
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt 
+      - MyEC2Instance
+      - PublicIp  
+  WebsiteURL:
+    Description: URL of the website
+    Value: !Sub http://www.justoaws.com   
